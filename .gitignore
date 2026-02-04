@@ -1,0 +1,33 @@
+# Binary & Build Files
+build/
+bin/
+*.class
+*.jar
+*.war
+*.ear
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Gradle & Go Wrapper/Wrapper
+.gradle/
+gradlew
+gradlew.bat
+gradle/wrapper/
+go/agent
+go/bin/
+
+# OS Files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.tmp/
+
+# Antigravity/Agent Metadata
+.gemini/
+.agent/
+brain/
