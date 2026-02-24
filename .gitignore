@@ -31,3 +31,6 @@ Thumbs.db
 .gemini/
 .agent/
 brain/
+
+# Rust
+rust/target/
