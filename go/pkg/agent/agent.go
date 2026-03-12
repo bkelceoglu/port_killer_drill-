@@ -16,7 +16,10 @@ type Sentry struct {
 	Hostname    string
 	CommanderIP string
 	Whitelist   []models.PortRange
+	Blacklist   []models.PortRange
 	Interval    time.Duration
+	configPath  string
+	currentMD5  string
 }
 
 func NewSentry(hostname, commanderIP string, interval time.Duration) *Sentry {
@@ -24,17 +27,44 @@ func NewSentry(hostname, commanderIP string, interval time.Duration) *Sentry {
 		Hostname:    hostname,
 		CommanderIP: commanderIP,
 		Interval:    interval,
+		configPath:  "ports_list.json",
+	}
+}
+
+func (s *Sentry) loadConfig() {
+	newMD5, err := whitelist.GetMD5(s.configPath)
+	if err != nil {
+		log.Printf("Error checking config MD5: %v", err)
+		return
+	}
+
+	if newMD5 != s.currentMD5 {
+		log.Printf("Config change detected. Reloading...")
+		w, b, err := whitelist.LoadJSON(s.configPath)
+		if err != nil {
+			log.Printf("Error loading JSON config: %v", err)
+			return
+		}
+		s.Whitelist = w
+		s.Blacklist = b
+		s.currentMD5 = newMD5
+		log.Printf("Loaded %d whitelist and %d blacklist rules", len(s.Whitelist), len(s.Blacklist))
 	}
 }
 
 func (s *Sentry) Start() {
 	log.Printf("Sentry active: [%s] monitoring for [%s]", s.Hostname, s.CommanderIP)
 
-	// Load Whitelist once at startup
-	s.Whitelist = whitelist.Load("whitelist.txt")
-	if len(s.Whitelist) > 0 {
-		log.Printf("Loaded %d whitelist rules", len(s.Whitelist))
-	}
+	// Initial Load
+	s.loadConfig()
+
+	// Periodic Config Reload (every 5 seconds)
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		for range ticker.C {
+			s.loadConfig()
+		}
+	}()
 
 	for {
 		conn, err := net.Dial("tcp", s.CommanderIP)
@@ -45,11 +75,11 @@ func (s *Sentry) Start() {
 		}
 
 		log.Printf("Connected to Commander [%s]. Synchronizing...", s.CommanderIP)
-		
+
 		if err := s.handleSession(conn); err != nil {
 			log.Printf("Session closed: %v. Reconnecting...", err)
 		}
-		
+
 		conn.Close()
 		time.Sleep(1 * time.Second)
 	}
@@ -98,7 +128,7 @@ func (s *Sentry) handleSession(conn net.Conn) error {
 func (s *Sentry) runLoop(conn net.Conn, stopCmd chan bool) error {
 	knownPorts := monitor.GetListeningPorts()
 	encoder := json.NewEncoder(conn)
-	
+
 	for {
 		select {
 		case <-stopCmd:
@@ -108,13 +138,44 @@ func (s *Sentry) runLoop(conn net.Conn, stopCmd chan bool) error {
 
 			for key, info := range currentPorts {
 				if _, exists := knownPorts[key]; !exists {
-					if whitelist.IsWhitelisted(info.Port, s.Whitelist) {
+					// Check Whitelist and Blacklist
+					isWhitelisted := whitelist.IsPortInRanges(info.Port, s.Whitelist)
+					isBlacklisted := whitelist.IsPortInRanges(info.Port, s.Blacklist)
+
+					if isBlacklisted {
+						log.Printf("BLACKLIST PORT DETECTED: %d (%s). Killing process %d...", info.Port, info.ProcessName, info.Pid)
+
+						// Immediate Kill
+						killed := false
+						if info.Pid > 0 {
+							killed = commander.KillPid(info.Pid)
+						}
+
+						alert := models.Alert{
+							Type:        "BLACK_KILLED",
+							Hostname:    s.Hostname,
+							Pid:         info.Pid,
+							ProcessName: info.ProcessName,
+							Port:        info.Port,
+							Protocol:    info.Protocol,
+							IsKilled:    killed,
+						}
+						if err := encoder.Encode(alert); err != nil {
+							return err
+						}
+						log.Printf("KILL ALERT SENT: %s port %d (Killed: %v)", info.ProcessName, info.Port, killed)
 						continue
 					}
 
 					if info.Pid > 0 {
+						alertType := "NEW_PORT"
+						if isWhitelisted {
+							alertType = "WHITELIST_PORT"
+							log.Printf("WHITELIST PORT DETECTED: %d (%s). Reporting...", info.Port, info.ProcessName)
+						}
+
 						alert := models.Alert{
-							Type:        "NEW_PORT",
+							Type:        alertType,
 							Hostname:    s.Hostname,
 							Pid:         info.Pid,
 							ProcessName: info.ProcessName,
@@ -124,7 +185,7 @@ func (s *Sentry) runLoop(conn net.Conn, stopCmd chan bool) error {
 						if err := encoder.Encode(alert); err != nil {
 							return err
 						}
-						log.Printf("ALERT SENT: %s opened port %d", info.ProcessName, info.Port)
+						log.Printf("ALERT SENT: %s opened port %d (Type: %s)", info.ProcessName, info.Port, alertType)
 					}
 				}
 			}

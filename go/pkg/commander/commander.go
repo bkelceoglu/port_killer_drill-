@@ -19,16 +19,7 @@ func HandleCommands(conn net.Conn) {
 			if ok {
 				pidToKill := int32(rawPid)
 				log.Printf("Received Kill Order for PID: %d", pidToKill)
-				proc, err := process.NewProcess(pidToKill)
-				if err == nil {
-					if err := proc.Kill(); err != nil {
-						log.Printf("Failed to kill process %d: %v", pidToKill, err)
-					} else {
-						log.Printf("Successfully killed process %d", pidToKill)
-					}
-				} else {
-					log.Printf("Could not find process %d: %v", pidToKill, err)
-				}
+				KillPid(pidToKill)
 			}
 		}
 	}
@@ -36,4 +27,18 @@ func HandleCommands(conn net.Conn) {
 		log.Printf("Commander listener error: %v", err)
 	}
 	log.Printf("Commander command listener stopped.")
+}
+
+func KillPid(pid int32) bool {
+	proc, err := process.NewProcess(pid)
+	if err != nil {
+		log.Printf("Could not find process %d: %v", pid, err)
+		return false
+	}
+	if err := proc.Kill(); err != nil {
+		log.Printf("Failed to kill process %d: %v", pid, err)
+		return false
+	}
+	log.Printf("Successfully killed process %d", pid)
+	return true
 }

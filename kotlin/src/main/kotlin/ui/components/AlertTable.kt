@@ -146,24 +146,36 @@ fun AlertRow(alert: Alert, onNeutralize: (Alert) -> Unit) {
 
 @Composable
 private fun NeutralizeButton(alert: Alert, onNeutralize: (Alert) -> Unit) {
-    val buttonLabel = if (alert.isKilled) "KILLED" else "NEUTRALIZE"
-    Button(
-            onClick = { onNeutralize(alert) },
-            enabled = !alert.isKilled,
-            colors =
-                    ButtonDefaults.buttonColors(
-                            containerColor = Color.Red,
-                            disabledContainerColor = Color(0xFF2E7D32)
-                    ),
-            shape = RoundedCornerShape(4.dp),
-            modifier = Modifier.height(32.dp),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-    ) {
-        Text(
-                buttonLabel,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-        )
+    if (alert.isKilled) {
+        Surface(
+                color = Color(0xFF2E7D32).copy(alpha = 0.2f),
+                shape = RoundedCornerShape(4.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E7D32)),
+                modifier = Modifier.height(32.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+                Text(
+                        "KILLED",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF81C784)
+                )
+            }
+        }
+    } else {
+        Button(
+                onClick = { onNeutralize(alert) },
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier.height(32.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+        ) {
+            Text(
+                    "NEUTRALIZE",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+            )
+        }
     }
 }

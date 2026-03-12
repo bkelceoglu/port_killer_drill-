@@ -2,9 +2,9 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "2.1.0"
+    kotlin("jvm") version "2.3.10"
     id("org.jetbrains.compose") version "1.7.3"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.0"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.3.10"
 }
 
 group = "com.natodrill"
@@ -34,16 +34,10 @@ compose.desktop {
 }
 
 kotlin {
-    jvmToolchain(21)
-}
-
-tasks.withType<KotlinCompile> {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-    }
+    jvmToolchain(25)
 }
 
 tasks.withType<JavaCompile> {
-    sourceCompatibility = "21"
-    targetCompatibility = "21"
+    sourceCompatibility = "25"
+    targetCompatibility = "25"
 }

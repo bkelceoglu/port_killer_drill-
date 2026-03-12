@@ -40,7 +40,7 @@ class ClientHandler(
             val genericMap = gson.fromJson(line, Map::class.java)
             when (genericMap["type"]) {
                 "HANDSHAKE" -> handleHandshake(line)
-                "NEW_PORT" -> handleAlert(line)
+                "NEW_PORT", "BLACK_KILLED", "WHITELIST_PORT" -> handleAlert(line)
             }
         } catch (e: Exception) {
             println("Error parsing message: ${e.message}")
@@ -67,7 +67,9 @@ class ClientHandler(
         val alertInfo = gson.fromJson(line, Alert::class.java)
         val alert = alertInfo.copy(ipAddress = socket.inetAddress.hostAddress)
         state.addAlert(alert)
-        handleAutoKill(alert)
+        if (!alert.isKilled && alert.type != "BLACK_KILLED" && alert.type != "WHITELIST_PORT") {
+            handleAutoKill(alert)
+        }
     }
 
     private fun handleAutoKill(alert: Alert) {
